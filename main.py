@@ -3,5 +3,5 @@ from fastapi import FastAPI
 app = FastAPI()
 
 @app.get("/")
-async def root():
+def read_book():
     return {"message": "Hello World"}
