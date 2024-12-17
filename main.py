@@ -17,7 +17,7 @@ def read_book():
 
 @app.get("/blogs")
 def get_blogs():
-    return {"data": "This is a blog of you"}
+    return {"data": "This is a blog of u"}
 
 @app.post("/make_blogs")
 def make_blogs(blog: Blog):
