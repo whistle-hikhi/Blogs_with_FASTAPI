@@ -6,6 +6,10 @@ from random import randrange
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import time
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = FastAPI()
 
@@ -16,10 +20,10 @@ class Blog(BaseModel):
 while True:
     try:
         conn = psycopg2.connect(
-            host="localhost",
-            database="fastapi",
-            user="postgres",
-            password="123456",
+            host=os.environ['host'],
+            database=os.environ['database'],
+            user=os.environ['user'],
+            password=os.environ['password'],
             cursor_factory=RealDictCursor
         )
         cursor = conn.cursor()
@@ -57,8 +61,7 @@ def get_blog(id: int):
     if not blog:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail=f"Blog with id {id} was not found")
-        # response.status_code = status.HTTP_404_NOT_FOUND
-        # return {"message": f"Blog with id {id} does not exist"}
+
     return {"blog details": blog}
 
 @app.delete("/blogs/{id}")
