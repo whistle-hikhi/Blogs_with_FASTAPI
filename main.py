@@ -45,6 +45,7 @@ def make_blogs(blog: Blog):
     my_blogs.append(blog_dict)
     return {"message": blog_dict}
 
+
 @app.get("/blogs/{id}")
 def get_blog(id: int):
     blog = find_blog(id)
