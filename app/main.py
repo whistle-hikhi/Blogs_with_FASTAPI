@@ -1,13 +1,18 @@
 from fastapi import FastAPI
-from fastapi import Body, Response, status, HTTPException
+from fastapi import Response, status, HTTPException
 from pydantic import BaseModel
-from typing import Optional
-from random import randrange
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import time
 import os
 from dotenv import load_dotenv
+import models
+from database import engine, SessionLocal, get_db
+from sqlalchemy.orm import Session
+from fastapi.params import Depends
+
+models.Base.metadata.create_all(bind=engine)
+
 
 load_dotenv()
 
@@ -20,10 +25,10 @@ class Blog(BaseModel):
 while True:
     try:
         conn = psycopg2.connect(
-            host=os.environ['host'],
-            database=os.environ['database'],
-            user=os.environ['user'],
-            password=os.environ['password'],
+            host=os.getenv('host'),
+            database=os.getenv('database'),
+            user=os.getenv('user'),
+            password=os.getenv('password'),
             cursor_factory=RealDictCursor
         )
         cursor = conn.cursor()
@@ -34,30 +39,30 @@ while True:
         print("Error: ", error)
         time.sleep(2)
 
-
 @app.get("/login")
 def read_book():
     return {"message": "Yahalo"}
 
 @app.get("/blogs")
-def get_blogs():
-    cursor.execute("""SELECT * FROM public.blogs""")
-    blogs = cursor.fetchall()
+def get_blogs(db: Session = Depends(get_db)):
+    blogs = db.query(models.Blog).all()
     return {"data": blogs}
 
 @app.post("/make_blogs", status_code=status.HTTP_201_CREATED)
-def make_blogs(blog: Blog):
-    cursor.execute("""INSERT INTO public.blogs (title, content, published) VALUES (%s, %s, %s) RETURNING *""",
-                   (blog.title, blog.content, blog.published))
-    new_post = cursor.fetchone()
-    conn.commit()
-    return {"message": new_post}
+def make_blogs(blog : Blog, db: Session = Depends(get_db)):
+    
+    new_blog = models.Blog(**blog.model_dump())
+    db.add(new_blog)
+    db.commit()
+    db.refresh(new_blog)
+    return {"data": new_blog}
 
 
 @app.get("/blogs/{id}")
-def get_blog(id: int):
-    cursor.execute("""SELECT * FROM public.blogs WHERE id = %s""", (str(id),))
-    blog = cursor.fetchone()
+def get_blog(id: int, db: Session = Depends(get_db)):
+
+    blog = db.query(models.Blog).filter(models.Blog.id == id).first()
+
     if not blog:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail=f"Blog with id {id} was not found")
@@ -65,27 +70,29 @@ def get_blog(id: int):
     return {"blog details": blog}
 
 @app.delete("/blogs/{id}")
-def delete_blog(id: int):
+def delete_blog(id: int, db: Session = Depends(get_db)):
 
-    cursor.execute("""DELETE FROM public.blogs WHERE id = %s RETURNING *""", (str(id),))
-    deleted_blog = cursor.fetchone()
-    conn.commit()
-
-    if not deleted_blog:
+    deleted_blog = db.query(models.Blog).filter(models.Blog.id == id)
+    blog = deleted_blog.first()
+    if blog == None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail=f"Blog with id {id} was not found")
+
+    deleted_blog.delete(synchronize_session=False)
+    db.commit()
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @app.put("/blogs/{id}")
-def update_blog(id: int, blog: Blog):
-    cursor.execute("""UPDATE public.blogs SET title = %s, content = %s, published = %s WHERE id = %s RETURNING *""",
-                   (blog.title, blog.content, blog.published, str(id)))
-    updated_blog = cursor.fetchone()
-    conn.commit()
-    if not updated_blog:
+def update_blog(id: int, blog: Blog, db: Session = Depends(get_db)):
+    updated_blog = db.query(models.Blog).filter(models.Blog.id == id)
+    blog = updated_blog.first()
+    
+    if blog == None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail=f"Blog with id {id} was not found")
     
+    updated_blog.update(blog.model_dump())
+    db.commit()
     return {"data": updated_blog}
