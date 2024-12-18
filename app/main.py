@@ -3,6 +3,9 @@ from fastapi import Body, Response, status, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 from random import randrange
+import psycopg2
+from psycopg2.extras import RealDictCursor
+import time
 
 app = FastAPI()
 
@@ -10,45 +13,47 @@ class Blog(BaseModel):
     title: str
     content: str
     published: bool=True
-    score: Optional[int]=None
+while True:
+    try:
+        conn = psycopg2.connect(
+            host="localhost",
+            database="fastapi",
+            user="postgres",
+            password="123456",
+            cursor_factory=RealDictCursor
+        )
+        cursor = conn.cursor()
+        print("Database connection was successful")
+        break
+    except Exception as error:
+        print("Database connection failed")
+        print("Error: ", error)
+        time.sleep(2)
 
-my_blogs = [{
-    "title": "My first blog",
-    "content": "This is my first blog",
-    "published": True,
-    "score": 8,
-    "id": 1
-},
-{
-    "title": "How to make a blog",
-    "content": "You need to know how to write a blog",
-    "published": True,
-    "score": 9,
-    "id": 2}]
 
-def find_blog(id):
-    for blog in my_blogs:
-        if blog["id"] == id:
-            return blog
 @app.get("/login")
 def read_book():
     return {"message": "Yahalo"}
 
 @app.get("/blogs")
 def get_blogs():
-    return {"data": my_blogs}
+    cursor.execute("""SELECT * FROM public.blogs""")
+    blogs = cursor.fetchall()
+    return {"data": blogs}
 
-@app.post("/make_blogs")
+@app.post("/make_blogs", status_code=status.HTTP_201_CREATED)
 def make_blogs(blog: Blog):
-    blog_dict = blog.model_dump()
-    blog_dict["id"] = randrange(0, 1000000)
-    my_blogs.append(blog_dict)
-    return {"message": blog_dict}
+    cursor.execute("""INSERT INTO public.blogs (title, content, published) VALUES (%s, %s, %s) RETURNING *""",
+                   (blog.title, blog.content, blog.published))
+    new_post = cursor.fetchone()
+    conn.commit()
+    return {"message": new_post}
 
 
 @app.get("/blogs/{id}")
 def get_blog(id: int):
-    blog = find_blog(id)
+    cursor.execute("""SELECT * FROM public.blogs WHERE id = %s""", (str(id),))
+    blog = cursor.fetchone()
     if not blog:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail=f"Blog with id {id} was not found")
@@ -58,20 +63,26 @@ def get_blog(id: int):
 
 @app.delete("/blogs/{id}")
 def delete_blog(id: int):
-    blog = find_blog(id)
-    if not blog:
+
+    cursor.execute("""DELETE FROM public.blogs WHERE id = %s RETURNING *""", (str(id),))
+    deleted_blog = cursor.fetchone()
+    conn.commit()
+
+    if not deleted_blog:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail=f"Blog with id {id} was not found")
-    my_blogs.remove(blog)
+
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @app.put("/blogs/{id}")
 def update_blog(id: int, blog: Blog):
-    blog_index = find_blog(id)
-    if not blog_index:
+    cursor.execute("""UPDATE public.blogs SET title = %s, content = %s, published = %s WHERE id = %s RETURNING *""",
+                   (blog.title, blog.content, blog.published, str(id)))
+    updated_blog = cursor.fetchone()
+    conn.commit()
+    if not updated_blog:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail=f"Blog with id {id} was not found")
-    blog_index.update(blog.model_dump())
     
-    return {"data": blog_index}
+    return {"data": updated_blog}
