@@ -3,16 +3,20 @@ from fastapi import FastAPI, Response, status, HTTPException, Depends, APIRouter
 import models, schemas
 from database import SessionLocal, get_db
 from sqlalchemy.orm import Session
+import oauth2
 
-router = APIRouter()
+router = APIRouter(
+    prefix="/blogs",
+    tags=["Blogs"]
+)
 
-@router.get("/blogs")
+@router.get("/")
 def get_blogs(db: Session = Depends(get_db)):
     blogs = db.query(models.Blog).all()
     return blogs
 
-@router.post("/make_blogs", status_code=status.HTTP_201_CREATED, response_model=schemas.BlogResponse)
-def make_blogs(blog : schemas.BlogCreate, db: Session = Depends(get_db)):
+@router.post("/", status_code=status.HTTP_201_CREATED, response_model=schemas.BlogResponse)
+def make_blogs(blog : schemas.BlogCreate, db: Session = Depends(get_db), user_id: int = Depends(oauth2.get_current_user)):
     
     new_blog = models.Blog(**blog.model_dump())
     db.add(new_blog)
@@ -21,7 +25,7 @@ def make_blogs(blog : schemas.BlogCreate, db: Session = Depends(get_db)):
     return new_blog
 
 
-@router.get("/blogs/{id}", response_model=schemas.BlogResponse)
+@router.get("/{id}", response_model=schemas.BlogResponse)
 def get_blog(id: int, db: Session = Depends(get_db)):
 
     blog = db.query(models.Blog).filter(models.Blog.id == id).first()
@@ -32,7 +36,7 @@ def get_blog(id: int, db: Session = Depends(get_db)):
 
     return blog
 
-@router.delete("/blogs/{id}")
+@router.delete("/{id}")
 def delete_blog(id: int, db: Session = Depends(get_db)):
 
     deleted_blog = db.query(models.Blog).filter(models.Blog.id == id)
@@ -47,7 +51,7 @@ def delete_blog(id: int, db: Session = Depends(get_db)):
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.put("/blogs/{id}", response_model=schemas.BlogResponse)
+@router.put("/{id}", response_model=schemas.BlogResponse)
 def update_blog(id: int, updated_blog: schemas.BlogCreate, db: Session = Depends(get_db)):
 
     query_blog = db.query(models.Blog).filter(models.Blog.id == id)

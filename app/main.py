@@ -6,7 +6,7 @@ import os
 from dotenv import load_dotenv
 import models
 from database import engine
-from routers import blog, user
+from routers import blog, user, auth
 
 
 
@@ -37,5 +37,5 @@ while True:
         time.sleep(2)
 
 app.include_router(blog.router)
-
 app.include_router(user.router)
+app.include_router(auth.router)
