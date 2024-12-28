@@ -4,7 +4,7 @@ from typing import Optional
 class BlogBase(BaseModel):
     title: str
     content: str
-    published: bool=True
+    published: bool=False
 
 class BlogCreate(BlogBase):
     pass
