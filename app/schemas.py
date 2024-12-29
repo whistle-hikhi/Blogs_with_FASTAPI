@@ -13,6 +13,7 @@ class BlogCreate(BlogBase):
 class BlogResponse(BlogBase):
     id: int
     created_at: datetime
+    owner_id: int
     class Config:
         from_attributes = True
 
@@ -26,7 +27,6 @@ class UserResponse(BaseModel):
     created_at: datetime
     class Config:
         from_attributes = True
-
 
 class UserLogin(BaseModel):
     email: EmailStr
